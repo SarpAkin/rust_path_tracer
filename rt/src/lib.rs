@@ -1,20 +1,15 @@
 use glam::Vec3;
 
 pub mod geometry;
+pub mod ray;
+pub mod util;
+pub use ray::Ray;
 
-#[derive(Debug, Clone, Copy)]
-pub struct Ray {
-	origin: Vec3,
-	direction: Vec3,
-}
 
-impl Ray {
-	pub fn origin(&self) -> Vec3 { return self.origin; }
-	pub fn direction(&self) -> Vec3 { return self.direction; }
-}
 
 pub struct HitMaterial{
-
+	pub normal:Vec3,
+	pub albedo:Vec3,
 }
 
 pub struct RayHit<'a> {
