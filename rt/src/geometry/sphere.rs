@@ -1,6 +1,6 @@
 use glam::Vec3;
 
-use crate::{Ray, RayHit, geometry::Geometry};
+use crate::{HitMaterial, Ray, RayHit, geometry::{AlwaysHit, DynGeometry, Geometry, GeometryContainer}, util::solve_quadratic};
 
 
 #[derive(Debug, Clone, Copy)]
