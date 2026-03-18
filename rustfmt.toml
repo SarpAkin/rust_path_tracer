@@ -1,0 +1,9 @@
+edition = "2021"
+max_width = 130
+fn_call_width = 130
+newline_style = "Unix"
+use_small_heuristics = "Max"
+fn_single_line = true
+
+hard_tabs = true   # Use tabs instead of spaces
+tab_spaces = 4  

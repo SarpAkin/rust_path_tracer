@@ -1,0 +1,16 @@
+[package]
+name = "path_tracer"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+members = [
+    "rt", 
+]
+
+[dependencies]
+bytemuck = "1.25.0"
+eyre = "0.6.12"
+glam = "0.32.1"
+png = "0.18.1"
+rt = { path = "./rt" }
