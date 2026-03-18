@@ -11,7 +11,7 @@ impl Geometry for AlwaysHit {
 		return Some(RayHit {
 			ray,
 			t: f32::INFINITY,
-			material: HitMaterial { normal: Vec3::ZERO, albedo: Vec3::ZERO },
+			material: HitMaterial { normal: Vec3::ZERO, albedo: Vec3::ZERO,roughness:0.0 },
 		});
 	}
 }

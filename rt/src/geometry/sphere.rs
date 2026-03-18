@@ -33,6 +33,7 @@ impl Geometry for Sphere {
 				material: HitMaterial {
 					albedo: self.color, //
 					normal,
+					roughness:0.3,
 				},
 			}
 		})
