@@ -1,6 +1,6 @@
 edition = "2021"
-max_width = 130
-fn_call_width = 130
+max_width = 110
+fn_call_width = 110
 newline_style = "Unix"
 use_small_heuristics = "Max"
 fn_single_line = true
