@@ -19,7 +19,7 @@ fn initialize_scene() -> impl Geometry  {
 
 	// let scene = Box::new(GeometryContainer::new())
 
-    Sphere::bundle_spheres(spheres).with_material_override(f)
+    Sphere::bundle_spheres(spheres)
 }
 
 fn perspective_div(v: Vec4) -> Vec3 { v.truncate() / v.w }
