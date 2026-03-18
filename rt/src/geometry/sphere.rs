@@ -3,16 +3,38 @@ use glam::Vec3;
 use crate::{Ray, RayHit, geometry::Geometry};
 
 
-#[derive(Debug,Clone, Copy)]
-pub struct Sphere{
-	pub center:Vec3,
-	pub radius:f32,
+#[derive(Debug, Clone, Copy)]
+pub struct Sphere {
+	pub center: Vec3,
+	pub radius: f32,
+	pub color:Vec3,
 }
 
-impl Geometry for Sphere{
-	fn ray_cast<'a>(ray: &'a Ray) -> Option<RayHit<'a>> {
-		
-		
-		todo!()
+impl Sphere {
+	pub fn new(c: Vec3, r: f32,color:Vec3) -> Sphere { Self { center: c, radius: r ,color} }
+
+	pub fn bundle_spheres(spheres: Vec<Sphere>) -> impl Geometry {
+		DynGeometry::new(GeometryContainer::new(AlwaysHit, spheres))
+	}
+}
+
+impl Geometry for Sphere {
+	fn ray_cast<'a>(&self, ray: &'a Ray) -> Option<RayHit<'a>> {
+		let delta = ray.origin() - self.center;
+		let delta_cos_dir = delta.dot(ray.direction());
+
+		solve_quadratic(1.0, 2.0 * delta_cos_dir, delta.length_squared() - self.radius * self.radius).map(|roots| {
+			let t = roots[0];
+			let normal = (delta + t * ray.direction()).normalize();
+
+			RayHit {
+				ray,
+				t,
+				material: HitMaterial {
+					albedo: self.color, //
+					normal,
+				},
+			}
+		})
 	}
 }
