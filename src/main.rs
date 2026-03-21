@@ -1,13 +1,17 @@
 use std::{ops::Deref, path::Path};
 
-use glam::{Mat4, Vec2, Vec3, Vec4};
+use glam::{IVec3, Mat4, Vec2, Vec3, Vec4};
 use rand::{Rng, RngExt};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rt::{
-	Ray,
+	HitMaterial, Ray,
 	geometry::{
-		Geometry, dynamic_geometry::DynGeometry, geometry_container::GeometryContainer,
-		material_override::GeometryExt, sphere::Sphere,
+		Geometry,
+		aabb::AABB,
+		dynamic_geometry::{DynGeometry, IntoDynGeometry},
+		geometry_container::{GeometryContainer, GeometryPack},
+		material_override::GeometryExt,
+		sphere::Sphere,
 	},
 };
 
@@ -15,17 +19,42 @@ use crate::image::{Image, encode_pixel};
 
 mod image;
 
+fn make_checker_board() -> impl Geometry {
+	AABB::new(Vec3::new(-100.0, -1.0, -100.0), Vec3::new(100.0, 0.0, 100.0), Vec3::ONE, 0.5)
+		.with_material_override(|h| {
+			let pos = h.hit_pos();
+			let n = (pos.floor().as_ivec3()).element_sum() & 1;
+			let color = if n == 1 { Vec3::new(0.8, 0.8, 0.85) } else { Vec3::new(0.12, 0.12, 0.15) };
+			HitMaterial { normal: h.material.normal, albedo: color, roughness: h.material.roughness }
+		})
+}
+
 fn initialize_scene() -> impl Geometry {
 	let spheres = vec![
-		Sphere::new(Vec3::new(0.0, 0.0, 10.0), 2.0, Vec3::new(0.0, 0.6, 0.5)), //
-		Sphere::new(Vec3::new(5.0, 0.0, 10.0), 3.0, Vec3::new(0.5, 0.6, 0.0)), //
-		Sphere::new(Vec3::new(0.0, -2.0, 16.0), 7.0, Vec3::new(0.5, 0.0, 0.5)), //
-		Sphere::new(Vec3::new(0.0, 20.0, 14.0), 13.0, Vec3::new(0.8, 0.8, 0.8)), //
-	];
+		//
+		Sphere::new(Vec3::new(0.0, 6.0, 0.0), 2.5, Vec3::ONE, 0.01),
+		Sphere::new(Vec3::new(3.0, 1.5, 0.0), 0.9, Vec3::new(0.5, 0.5, 1.0), 0.1),
+		// Sphere::new(Vec3::new(0.0, 6.0, 0.0), 2.5, Vec3::ONE, 0.01),
+	]
+	.into_geometry_container()
+	.into_dyn_geometry();
 
-	// let scene = Box::new(GeometryContainer::new())
+	// Sphere::bundle_spheres(spheres)
 
-	Sphere::bundle_spheres(spheres)
+	let boxes = AABB::bundle(vec![
+		// AABB::new(Vec3::new(-10.0, -2.0, -10.0),Vec3::new(10.0,0.0,10.0),Vec3::ONE,0.5),
+		AABB::new(Vec3::new(-2.0, -2.0, -2.0), Vec3::new(2.0, 2.0, 2.0), Vec3::new(0.5, 0.5, 0.5), 0.01),
+	])
+	.into_dyn_geometry();
+
+	let checkerboard = make_checker_board().into_dyn_geometry();
+
+	vec![
+		// boxes,
+		checkerboard,
+		spheres,
+	]
+	.into_geometry_container()
 }
 
 fn perspective_div(v: Vec4) -> Vec3 { v.truncate() / v.w }
@@ -38,9 +67,9 @@ fn make_ray_from_camera(inv_proj_view: &Mat4, screen_pos: Vec2) -> Ray {
 }
 
 fn calculate_skybox_color(rd: Vec3) -> Vec3 {
-	let sun_dir = Vec3::new(0.5, -0.9, 0.1).normalize();
-	let sun_color = Vec3::new(0.7, 0.7, 0.5) * 1.3;
-	rd.dot(sun_dir) * sun_color
+	let sun_dir = Vec3::new(0.1, -0.9, 0.1).normalize();
+	let sun_color = Vec3::ONE * 2.5;
+	(-rd.dot(sun_dir)).max(0.0) * sun_color
 }
 
 fn rand_unit_vector() -> Vec3 {
@@ -69,7 +98,7 @@ fn cast_ray_and_calculate_color(ray: Ray, scene: &dyn Geometry, recursion_limit:
 		return hit.material.albedo;
 	}
 
-	let num_rays = if recursion_limit > 1 { 55 } else { 5 };
+	let num_rays = if recursion_limit > 1 { 15 } else { 5 };
 	let reflect_color_sum = (0..num_rays)
 		.map(|_| {
 			let normal = hit_normal.lerp(rand_unit_vector(), hit_roughness).normalize();
@@ -84,12 +113,11 @@ fn cast_ray_and_calculate_color(ray: Ray, scene: &dyn Geometry, recursion_limit:
 }
 
 fn render(scene: &dyn Geometry) -> Image {
-	let cam_pos = Vec3::new(0.0, 0.0, 0.0);
+	let cam_pos = Vec3::new(0.0, 5.0, -10.0);
 	let cam_dir = Vec3::new(0.0, 0.0, 1.0);
 	let up = Vec3::new(0.0, 1.0, 0.0);
 
-	let dims = 8192;
-
+	let dims = 2048;
 
 	let aspect_ratio = 1.0;
 
@@ -98,19 +126,23 @@ fn render(scene: &dyn Geometry) -> Image {
 
 	let inv_proj_view = (proj * view).inverse();
 
+	let vec: Vec<u32> = (0..dims)
+		.into_par_iter()
+		.flat_map_iter(|y| {
+			(0..dims).map(move |x| {
+				let mut screen_pos = Vec2::new(
+					x as f32 / dims as f32, //
+					y as f32 / dims as f32,
+				) * 2.0 - 1.0;
 
-	let vec:Vec<u32> = (0..dims).into_par_iter().flat_map_iter(|y| {
-		(0..dims).map(move |x| {
-			let screen_pos = Vec2::new(
-				x as f32 / dims as f32, //
-				y as f32 / dims as f32,
-			) * 2.0 - 1.0;
+				screen_pos.y = -screen_pos.y;
 
-			let ray = make_ray_from_camera(&inv_proj_view, screen_pos);
-			let color = cast_ray_and_calculate_color(ray, scene, 2);
-			encode_pixel(color.x, color.y, color.z, 1.0)
+				let ray = make_ray_from_camera(&inv_proj_view, screen_pos);
+				let color = cast_ray_and_calculate_color(ray, scene, 2);
+				encode_pixel(color.x, color.y, color.z, 1.0)
+			})
 		})
-	}).collect();
+		.collect();
 
 	Image::from_vec(dims, dims, vec)
 }
