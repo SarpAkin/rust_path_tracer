@@ -1,4 +1,4 @@
-use crate::{Ray, RayHit, geometry::Geometry};
+use crate::{Ray, RayHit, geometry::{AlwaysHit, Geometry}};
 
 pub struct GeometryContainer<Boundary: Geometry, Children: Geometry> {
 	boundary: Boundary,
@@ -23,4 +23,15 @@ impl<TB: Geometry, TC: Geometry> Geometry for GeometryContainer<TB, TC> {
 
 impl<TB: Geometry, TC: Geometry> GeometryContainer<TB, TC> {
 	pub fn new(boundary: TB,children:Vec<TC>) -> GeometryContainer<TB, TC> { Self { boundary, children } }
+}
+
+
+pub trait GeometryPack<T:Geometry>{
+	fn into_geometry_container(self) -> GeometryContainer<AlwaysHit,T>;
+}
+
+impl<T:Geometry> GeometryPack<T> for Vec<T> {
+	fn into_geometry_container(self) -> GeometryContainer<AlwaysHit,T> {
+		GeometryContainer::new(AlwaysHit, self)
+	}
 }
