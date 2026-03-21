@@ -12,14 +12,22 @@ pub struct Image {
 }
 
 impl Image {
-	pub fn width(&self) -> u32 {self.width}
-	pub fn height(&self) -> u32 {self.height}
- 
+	pub fn width(&self) -> u32 { self.width }
+	pub fn height(&self) -> u32 { self.height }
+
 	pub fn new(width: u32, height: u32, initial_color: u32) -> Self {
 		Self {
 			width, //
 			height,
 			pixels: (0..(width * height)).map(|_| initial_color).collect(),
+		}
+	}
+
+	pub fn from_vec(width: u32, height: u32, pixels:Vec<u32>) -> Self {
+		Self {
+			width, //
+			height,
+			pixels
 		}
 	}
 

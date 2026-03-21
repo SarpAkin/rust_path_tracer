@@ -9,7 +9,7 @@ impl<T: Geometry, F: Fn(HitMaterial) -> HitMaterial + 'static> MaterialOverride<
 	pub fn new(g: T, f: F) -> MaterialOverride<T, F> { return Self { inner: g, func: f } }
 }
 
-impl<T: Geometry, F: Fn(HitMaterial) -> HitMaterial + 'static> Geometry for MaterialOverride<T, F> {
+impl<T: Geometry, F: Fn(HitMaterial) -> HitMaterial + 'static + Sync> Geometry for MaterialOverride<T, F> {
 	fn ray_cast<'a>(&self, ray: &'a Ray) -> Option<RayHit<'a>> {
 		self.inner.ray_cast(ray).map(|h| RayHit {
 			ray: h.ray, //

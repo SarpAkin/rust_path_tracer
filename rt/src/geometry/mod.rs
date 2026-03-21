@@ -15,7 +15,7 @@ pub use dynamic_geometry::DynGeometry;
 pub use always_hit::AlwaysHit;
 pub use material_override::MaterialOverride;
 
-pub trait Geometry: Any {
+pub trait Geometry: Any + Sync{
 	// cast a ray and returns RayHit if it hits anything. if not None is returned.
 	fn ray_cast<'a>(&self,ray: &'a Ray) -> Option<RayHit<'a>>;
 }
