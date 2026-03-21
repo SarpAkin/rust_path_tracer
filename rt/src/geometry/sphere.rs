@@ -11,10 +11,11 @@ pub struct Sphere {
 	pub center: Vec3,
 	pub radius: f32,
 	pub color: Vec3,
+	pub roughness:f32,
 }
 
 impl Sphere {
-	pub fn new(c: Vec3, r: f32, color: Vec3) -> Sphere { Self { center: c, radius: r, color } }
+	pub fn new(c: Vec3, r: f32, color: Vec3,roughness:f32) -> Sphere { Self { center: c, radius: r, color,roughness } }
 
 	pub fn bundle_spheres(spheres: Vec<Sphere>) -> impl Geometry {
 		DynGeometry::new(GeometryContainer::new(AlwaysHit, spheres))
@@ -44,7 +45,7 @@ impl Geometry for Sphere {
 			material: HitMaterial {
 				albedo: self.color, //
 				normal,
-				roughness: 0.3,
+				roughness: self.roughness,
 			},
 		})
 	}
