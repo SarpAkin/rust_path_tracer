@@ -1,6 +1,6 @@
 use std::{ops::Deref, path::Path};
 
-use glam::{IVec3, Mat4, Vec2, Vec3, Vec4};
+use glam::{IVec3, Mat4, Vec2, Vec2Swizzles, Vec3, Vec3Swizzles, Vec4};
 use rand::{Rng, RngExt};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rt::{
@@ -29,6 +29,42 @@ fn make_checker_board() -> impl Geometry {
 		})
 }
 
+fn encode2(n: Vec3) -> Vec2 {
+	let scale = 1.7777;
+	let mut enc = n.xy() / (n.z + 1.0);
+	enc /= scale;
+	enc = enc * 0.5 + 0.5;
+	return enc;
+}
+
+fn encode_spherical(n: Vec3) -> Vec2 {
+	let p = (n.z * 8.0 + 8.0).sqrt();
+	n.xy() / p + 0.5
+}
+
+fn oct_wrap(v: Vec2) -> Vec2 { (1.0 - (v.yx()).abs()) * v.xy().signum() }
+
+fn encode_octa(mut n: Vec3) -> Vec2 {
+	n /= (n.x).abs() + (n.y).abs() + (n.z).abs();
+	let mut xy = if n.z >= 0.0 { n.xy() } else { oct_wrap(n.xy()) };
+	xy = xy * 0.5 + 0.5;
+	return xy;
+}
+
+fn checkerboard_sphere() -> impl Geometry {
+	//
+	Sphere::new(Vec3::new(0.0, 5.0, 0.0), 2.0, Vec3::ZERO, 0.0).with_material_override(|h| {
+		let spherical = encode_octa(h.material.normal);
+		let tile_pos = (spherical * 25.0).as_ivec2();
+
+		// let color = Vec3::new(spherical.x, spherical.y, 0.0);
+		let checker_board = if tile_pos.element_sum() & 1 == 0 { 0.9 } else { 0.1 };
+		let color = Vec3::new(spherical.x, spherical.y, checker_board);
+
+		HitMaterial { normal: h.material.normal, albedo: color, roughness: 0.7 }
+	})
+}
+
 fn initialize_scene() -> impl Geometry {
 	let spheres = vec![
 		//
@@ -50,7 +86,7 @@ fn initialize_scene() -> impl Geometry {
 	let checkerboard = make_checker_board().into_dyn_geometry();
 
 	vec![
-		// boxes,
+		// checkerboard_sphere().into_dyn_geometry(),
 		checkerboard,
 		spheres,
 	]
@@ -98,7 +134,7 @@ fn cast_ray_and_calculate_color(ray: Ray, scene: &dyn Geometry, recursion_limit:
 		return hit.material.albedo;
 	}
 
-	let num_rays = if recursion_limit > 1 { 15 } else { 5 };
+	let num_rays = if recursion_limit > 1 { 20 } else { 5 };
 	let reflect_color_sum = (0..num_rays)
 		.map(|_| {
 			let normal = hit_normal.lerp(rand_unit_vector(), hit_roughness).normalize();
@@ -112,9 +148,15 @@ fn cast_ray_and_calculate_color(ray: Ray, scene: &dyn Geometry, recursion_limit:
 	hit.material.albedo * reflect_color_sum
 }
 
+fn sample(inv_proj_view: &Mat4, scene: &dyn Geometry, screen_pos: Vec2) -> Vec3 {
+	let ray = make_ray_from_camera(&inv_proj_view, screen_pos);
+	let color = cast_ray_and_calculate_color(ray, scene, 2);
+	color
+}
+
 fn render(scene: &dyn Geometry) -> Image {
-	let cam_pos = Vec3::new(0.0, 5.0, -10.0);
-	let cam_dir = Vec3::new(0.0, 0.0, 1.0);
+	let cam_pos = Vec3::new(-10.0, 10.0, -10.0);
+	let cam_dir = Vec3::new(1.0, 0.0, 1.0);
 	let up = Vec3::new(0.0, 1.0, 0.0);
 
 	let dims = 2048;
@@ -125,6 +167,15 @@ fn render(scene: &dyn Geometry) -> Image {
 	let proj = Mat4::perspective_rh(90.0f32.to_radians(), aspect_ratio, 0.1, 100.0);
 
 	let inv_proj_view = (proj * view).inverse();
+
+	let pixel_size = Vec2::splat(1.0 / dims as f32);
+
+	let super_sample_offsets = [
+		Vec2::new(0.50, 0.50), //
+		Vec2::new(0.50, -0.50),
+		Vec2::new(-0.50, 0.50),
+		Vec2::new(-0.50, -0.50),
+	];
 
 	let vec: Vec<u32> = (0..dims)
 		.into_par_iter()
@@ -137,8 +188,10 @@ fn render(scene: &dyn Geometry) -> Image {
 
 				screen_pos.y = -screen_pos.y;
 
-				let ray = make_ray_from_camera(&inv_proj_view, screen_pos);
-				let color = cast_ray_and_calculate_color(ray, scene, 2);
+				let color = super_sample_offsets
+					.iter() //
+					.map(|o| sample(&inv_proj_view, scene, screen_pos + (o * pixel_size)))
+					.sum::<Vec3>() / super_sample_offsets.len() as f32;
 				encode_pixel(color.x, color.y, color.z, 1.0)
 			})
 		})
@@ -152,5 +205,5 @@ fn main() {
 
 	let image = render(&scene);
 
-	image.write_to_png(Path::new("a.png")).unwrap();
+	image.write_to_png(Path::new("output.png")).unwrap();
 }
